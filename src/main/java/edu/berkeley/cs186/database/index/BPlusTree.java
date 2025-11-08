@@ -147,6 +147,9 @@ public class BPlusTree {
 
         // TODO(proj2): implement
 
+
+
+
         return Optional.empty();
     }
 
@@ -265,9 +268,13 @@ public class BPlusTree {
      * Bulk loads data into the B+ tree. Tree should be empty and the data
      * iterator should be in sorted order (by the DataBox key field) and
      * contain no duplicates (no error checking is done for this).
-     *
+     *  批量加载数据到 B+ 树中。树应该为空，并且数据迭代器应该按排序顺序（按 DataBox 键字段）且
+     * 不包含重复项（不进行错误检查）。
      * fillFactor specifies the fill factor for leaves only; inner nodes should
      * be filled up to full and split in half exactly like in put.
+     *
+     * fillFactor 指定仅针对叶节点的填充因子；内部节点应该填满并像 put 中一样精确地分裂成两半。
+     *
      *
      * This method should raise an exception if the tree is not empty at time
      * of bulk loading. Bulk loading is used when creating a new Index, so think 
@@ -277,8 +284,14 @@ public class BPlusTree {
      * cases however you want (or not at all) and you are not required to 
      * write any explicit checks.
      *
+     *  如果在批量加载时树不为空，此方法应该抛出异常。批量加载用于创建新索引，因此请考虑
+     * “空”树应该是什么样子。如果数据不符合前提条件（包含重复项或未排序），则结果行为未定义。
+     * 未定义行为意味着你可以按任何方式处理这些情况（或根本不处理），并且不需要编写任何显式检查。
+     *
+     *
      * The behavior of this method should be similar to that of InnerNode's
      * bulkLoad (see comments in BPlusNode.bulkLoad).
+     * 此方法的行为应该类似于 InnerNode 的 bulkLoad（参见 BPlusNode.bulkLoad 中的注释）。
      */
     public void bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
         // TODO(proj4_integration): Update the following line
@@ -288,6 +301,25 @@ public class BPlusTree {
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
+        //开始只有一个leaf 后边逐渐变为inner作为root节点
+
+        while (data.hasNext()) {
+
+            Optional<Pair<DataBox, Long>> pairOptional = root.bulkLoad(data, fillFactor);
+            //子节点开始分裂
+            if (pairOptional.isPresent()) {
+                Pair<DataBox, Long> pair = pairOptional.get();
+                DataBox dataBox = pair.getFirst();
+                Long recordId = pair.getSecond();
+                ArrayList<DataBox> keys = new ArrayList<>();
+                keys.add(dataBox);
+                ArrayList<Long> ids = new ArrayList<>();
+                ids.add(recordId);
+
+                InnerNode innerNode = new InnerNode(this.metadata, this.bufferManager, keys, ids, this.lockContext);
+                updateRoot(innerNode);
+            }
+        }
 
         return;
     }

@@ -30,6 +30,9 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * project2 task2 -inner
+ */
 @Category(Proj2Tests.class)
 public class TestInnerNode {
     private BufferManager bufferManager;

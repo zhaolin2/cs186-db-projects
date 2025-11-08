@@ -9,8 +9,10 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import java.awt.*;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.List;
 
 /**
  * A leaf of a B+ tree. Every leaf in a B+ tree of order d stores between d and
@@ -97,7 +99,16 @@ class LeafNode extends BPlusNode {
     //
     // Make sure your code (or your tests) doesn't use stale in-memory cached
     // values of keys and rids.
+    /**
+     * B+ 树中用来排序和查找的键 始终升序排列
+     * 不存储实际数据，只用于快速定位
+     */
     private List<DataBox> keys;
+    /**
+     * 每个 rid 是一个指向数据库中真实数据位置的指针
+     * pageNum：数据所在的页面号
+     * slotNum：页面内的槽位号（记录编号）
+     */
     private List<RecordId> rids;
 
     // If this leaf is the rightmost leaf, then rightSibling is Optional.empty().
@@ -106,6 +117,7 @@ class LeafNode extends BPlusNode {
     private Optional<Long> rightSibling;
 
     // Constructors ////////////////////////////////////////////////////////////
+
     /**
      * Construct a brand new leaf node. This constructor will fetch a new pinned
      * page from the provided BufferManager `bufferManager` and persist the node
@@ -114,8 +126,8 @@ class LeafNode extends BPlusNode {
     LeafNode(BPlusTreeMetadata metadata, BufferManager bufferManager, List<DataBox> keys,
              List<RecordId> rids, Optional<Long> rightSibling, LockContext treeContext) {
         this(metadata, bufferManager, bufferManager.fetchNewPage(treeContext, metadata.getPartNum()),
-             keys, rids,
-             rightSibling, treeContext);
+                keys, rids,
+                rightSibling, treeContext);
     }
 
     /**
@@ -144,47 +156,216 @@ class LeafNode extends BPlusNode {
 
     // Core API ////////////////////////////////////////////////////////////////
     // See BPlusNode.get.
+
+    /**
+     * {@link BPlusNode#get(DataBox)}
+     * 从左往右遍历
+     * 判断是否大于当前节点的最小值
+     *
+     * 从右往左判断 返回满足的第一个
+     *
+     * 那么假如我从左往右判断 判断条件应该是小于当前节点的最小值
+     * 假如x比当前节点的最大值都大 就尝试去右边
+     * 假如x比当前节点的最小值都小 尝试返回null 表示当前节点不满足
+     *
+     */
     @Override
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
 
+        if (keys.isEmpty()) {
+            return this;
+        }
+
+        DataBox minData = keys.get(0);
+        DataBox maxData = keys.get(keys.size() - 1);
+
+        if (key.compareTo(minData) >= 0 && key.compareTo(maxData) <= 0) {
+            return this;
+        }
+
+
+//        Optional<LeafNode> rightSibling = this.getRightSibling();
+//        if (rightSibling.isPresent()) {
+//            LeafNode leafNodeFromRightNode = rightSibling.get().get(key);
+//            if (Objects.nonNull(leafNodeFromRightNode)) {
+//                return leafNodeFromRightNode;
+//            } else {
+//                return null;
+//            }
+//        }
+
+
         return null;
     }
 
-    // See BPlusNode.getLeftmostLeaf.
+    // See BPlusNode.getLeftmostLeaf. 看起来子节点直接返回他自己
     @Override
     public LeafNode getLeftmostLeaf() {
         // TODO(proj2): implement
 
-        return null;
+        return this;
     }
 
+    /**
+     * 需要时从小到大插入
+     * @param key
+     * @param rid
+     * @return
+     */
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        if (this.keys.contains(key)) {
+            throw new BPlusTreeException("key已存在");
+        }
+
+        int maxNumber = tryGetMaxNumber();
+
+        if (this.keys.isEmpty()) {
+            this.keys.add(key);
+            this.rids.add(rid);
+            return Optional.empty();
+        }
+        Boolean whetherInsert = false;
+        int size = this.keys.size();
+        for (int i = 0; i < size; i++) {
+            DataBox dataBox = this.keys.get(i);
+            if (key.compareTo(dataBox) < 0) {
+                int insertIndex = i;
+//                if (insertIndex < 0) {
+//                    insertIndex = 0;
+//                }
+                this.keys.add(insertIndex, key);
+                this.rids.add(insertIndex, rid);
+                whetherInsert = true;
+                break;
+            }
+        }
+
+        if (!whetherInsert){
+            this.keys.add(key);
+            this.rids.add(rid);
+        }
+
+
+        if (this.keys.size() <= maxNumber) {
+            sync();
+            return Optional.empty();
+        } else {
+            //需要分裂的时候 需要当前节点保留d个
+            LeafNode rightNode = buildRightNode();
+            DataBox dataBox = rightNode.keys.get(0);
+            RecordId recordId = rightNode.rids.get(0);
+
+            Pair<DataBox, Long> pair = new Pair<>(dataBox, recordId.getPageNum());
+
+            return Optional.of(pair);
+        }
+
+
+    }
+
+    private LeafNode buildRightNode() {
+
+        Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+        LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+        //当前节点的右端点放在新端点的右边
+        rightNode.rightSibling = this.rightSibling;
+        this.rightSibling = Optional.of(newPage.getPageNum());
+
+        int d = this.metadata.getOrder();
+        Iterator<DataBox> keyIterator = this.keys.iterator();
+        Iterator<RecordId> ridIterator = this.rids.iterator();
+        int index = 1;
+
+
+        while (keyIterator.hasNext() && ridIterator.hasNext()) {
+            DataBox key = keyIterator.next();
+            RecordId rid = ridIterator.next();
+            if (index > d) {
+                keyIterator.remove();
+                ridIterator.remove();
+                rightNode.keys.add(key);
+                rightNode.rids.add(rid);
+            }
+
+            index++;
+        }
+        rightNode.sync();
+
+
+        return rightNode;
     }
 
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
-            float fillFactor) {
-        // TODO(proj2): implement
+                                                  float fillFactor) {
+        // 当前叶子节点能容纳的最大值
+        int currentMaxNumber = (int) Math.ceil(tryGetMaxNumber() * fillFactor);
+
+
+        while (data.hasNext()) {
+            Pair<DataBox, RecordId> pair = data.next();
+
+
+         //   叶节点不会填充到 2*d+1 条记录后分裂，而是填充到比 fillFactor 多一条记录，
+        // 然后通过创建一个只包含一条记录的右兄弟节点进行“分裂”（原始节点保持所需的填充因子）。
+            if (this.keys.size() > currentMaxNumber+1) {
+                Optional<LeafNode> rightSibling = this.getRightSibling();
+                if (rightSibling.isPresent()) {
+                    LeafNode rightLeafNode = rightSibling.get();
+                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
+                } else {
+                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+                    LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+                    //当前节点的右端点放在新端点的右边
+                    rightNode.rightSibling = this.rightSibling;
+                    this.rightSibling = Optional.of(newPage.getPageNum());
+                    rightNode.sync();
+
+                    return Optional.of(new Pair<>(pair.getFirst(),pair.getSecond().getPageNum()));
+                }
+
+            }else {
+                this.keys.add(pair.getFirst());
+                this.rids.add(pair.getSecond());
+            }
+
+        }
+        sync();
 
         return Optional.empty();
+    }
+
+    /**
+     *
+     * @return 当前节点能容纳的最大值
+     */
+    private int tryGetMaxNumber() {
+        return metadata.getOrder() * 2;
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
+        int i = this.keys.indexOf(key);
+        if (!Objects.equals(i, -1)) {
+            this.keys.remove(i);
+            this.rids.remove(i);
+        }
+        sync();
+
 
         return;
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
+
     /** Return the record id associated with `key`. */
     Optional<RecordId> getKey(DataBox key) {
         int index = keys.indexOf(key);
@@ -194,6 +375,8 @@ class LeafNode extends BPlusNode {
     /**
      * Returns an iterator over the record ids of this leaf in ascending order of
      * their corresponding keys.
+     *
+     * 返回此叶子节点记录 ID 的迭代器，按其对应的键升序排列。
      */
     Iterator<RecordId> scanAll() {
         return rids.iterator();
@@ -377,7 +560,29 @@ class LeafNode extends BPlusNode {
         // use the constructor that reuses an existing page instead of fetching a
         // brand new one.
 
-        return null;
+        Page page = bufferManager.fetchPage(treeContext, pageNum);
+        Buffer buffer = page.getBuffer();
+
+        // 代表当前node是leftNode
+        byte beginByte = buffer.get();
+        long rightSibling = buffer.getLong();
+
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> rids = new ArrayList<>();
+
+        int keySize = buffer.getInt();
+        for (int i = 0; i < keySize; i++) {
+
+            Type type = metadata.getKeySchema();
+            DataBox dataBox = DataBox.fromBytes(buffer, type);
+            keys.add(dataBox);
+            RecordId rid = RecordId.fromBytes(buffer);
+            rids.add(rid);
+        }
+
+
+        return new LeafNode(metadata, bufferManager, page, keys, rids, Optional.of(rightSibling), treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
@@ -391,9 +596,9 @@ class LeafNode extends BPlusNode {
         }
         LeafNode n = (LeafNode) o;
         return page.getPageNum() == n.page.getPageNum() &&
-               keys.equals(n.keys) &&
-               rids.equals(n.rids) &&
-               rightSibling.equals(n.rightSibling);
+                keys.equals(n.keys) &&
+                rids.equals(n.rids) &&
+                rightSibling.equals(n.rightSibling);
     }
 
     @Override

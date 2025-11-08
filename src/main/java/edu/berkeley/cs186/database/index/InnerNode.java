@@ -42,6 +42,10 @@ class InnerNode extends BPlusNode {
     // LeafNode.keys and LeafNode.rids in LeafNode.java for a warning on the
     // difference between the keys and children here versus the keys and children
     // stored on disk. `keys` is always stored in ascending order.
+    // 此内部节点的键和子节点指针。
+// 有关此处 keys 和 children 与磁盘上存储的键和子节点之间的区别，
+// 请参阅 LeafNode.java 中 LeafNode.keys 和 LeafNode.rids 上方的注释警告。
+// `keys` 始终按升序存储。
     private List<DataBox> keys;
     private List<Long> children;
 
@@ -82,7 +86,44 @@ class InnerNode extends BPlusNode {
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
 
-        return null;
+        for (int i = 0; i < this.keys.size(); i++) {
+            DataBox dataBox = this.keys.get(i);
+
+            //小于当前节点 则返回左指针
+            if (key.compareTo(dataBox)<0){
+                Long child = this.children.get(i);
+                return LeafNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, child);
+            }
+        }
+
+
+//        for (Long child : this.children) {
+//
+//            //假如在当前节点中 那么可以返回
+//            LeafNode returnLeafNode = leafNode.get(key);
+//            if (Objects.equals(returnLeafNode,leafNode)) {
+//                return leafNode;
+//            }
+//            //假如比当前节点右侧的还小 则可以返回
+//
+//            Optional<LeafNode> rightSibling = leafNode.getRightSibling();
+//            if (rightSibling.isPresent()) {
+//              LeafNode  rightNode = rightSibling.get();
+//                List<DataBox> rightNodeKeys = rightNode.getKeys();
+//                if (rightNodeKeys.isEmpty()) {
+//                    return leafNode;
+//                }else {
+//                    DataBox leftDataBox = rightNodeKeys.get(0);
+//                    if (key.compareTo(leftDataBox) < 0) {
+//                        return leafNode;
+//                    }
+//                }
+//            }
+//        }
+
+
+
+        return LeafNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, this.children.get(this.children.size()-1));
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -91,13 +132,51 @@ class InnerNode extends BPlusNode {
         assert(children.size() > 0);
         // TODO(proj2): implement
 
-        return null;
+        return LeafNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, this.children.get(0));
     }
 
+    /**
+     * 看起来只有分裂的键才会加入当前节点
+     * @param key
+     * @param rid
+     * @return
+     */
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
+        //需要找到个节点加入 好像看起来get就是我需要的方法
+        LeafNode leafNode = get(key);
+        Optional<Pair<DataBox, Long>> leafReturnValue = leafNode.put(key, rid);
+        if (leafReturnValue.isPresent()) {
+            Pair<DataBox, Long> pair = leafReturnValue.get();
+            DataBox data = pair.getFirst();
+            Long pageId = pair.getSecond();
+
+            Boolean whetherInsert = false;
+            int size = this.keys.size();
+            for (int i = 0; i < size; i++) {
+                DataBox dataBox = this.keys.get(i);
+                if (key.compareTo(dataBox) < 0) {
+                    int insertIndex = i;
+//                if (insertIndex < 0) {
+//                    insertIndex = 0;
+//                }
+                    this.keys.add(insertIndex, key);
+                    this.children.add(insertIndex, pageId);
+                    whetherInsert = true;
+                    break;
+                }
+            }
+
+            if (!whetherInsert){
+                this.keys.add(key);
+                this.children.add( pageId);
+            }
+
+            this.keys.add(data);
+            this.children.add(pageId);
+        }
 
         return Optional.empty();
     }
@@ -108,14 +187,88 @@ class InnerNode extends BPlusNode {
             float fillFactor) {
         // TODO(proj2): implement
 
+        // 当前叶子节点能容纳的最大值
+        int currentMaxNumber = tryGetMaxNumber();
+
+        BPlusNode child = getChild(this.children.size() - 1);
+        child.bulkLoad(data, fillFactor);
+
+
+//        while (data.hasNext()) {
+//            Pair<DataBox, RecordId> pair = data.next();
+//
+//
+//            //   叶节点不会填充到 2*d+1 条记录后分裂，而是填充到比 fillFactor 多一条记录，
+//            // 然后通过创建一个只包含一条记录的右兄弟节点进行“分裂”（原始节点保持所需的填充因子）。
+//            if (this.keys.size() > currentMaxNumber+1) {
+//                Optional<LeafNode> rightSibling = this.getRightSibling();
+//                if (rightSibling.isPresent()) {
+//                    LeafNode rightLeafNode = rightSibling.get();
+//                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
+//                } else {
+//                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+//                    LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+//                    当前节点的右端点放在新端点的右边
+//                    rightNode.rightSibling = this.rightSibling;
+//                    this.rightSibling = Optional.of(newPage.getPageNum());
+//
+//                    return Optional.of(new Pair<>(pair.getFirst(),pair.getSecond().getPageNum()));
+//                }
+//
+//            }else {
+//                this.keys.add(pair.getFirst());
+//            }
+//
+//        }
+
         return Optional.empty();
+
+        // 当前叶子节点能容纳的最大值
+//        int currentMaxNumber = (int) Math.ceil(tryGetMaxNumber() * fillFactor);
+
+
+//        while (data.hasNext()) {
+//            Pair<DataBox, RecordId> pair = data.next();
+//            this.keys.add(pair.getFirst());
+//            this.rids.add(pair.getSecond());
+//
+//            //逻辑待验证
+//            if (this.keys.size() > currentMaxNumber) {
+//                Optional<LeafNode> rightSibling = this.getRightSibling();
+//                if (rightSibling.isPresent()) {
+//                    LeafNode rightLeafNode = rightSibling.get();
+//                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
+//                } else {
+//                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+//                    LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+//                    //当前节点的右端点放在新端点的右边
+//                    rightNode.rightSibling = this.rightSibling;
+//                    this.rightSibling = Optional.of(newPage.getPageNum());
+//                }
+//
+//            }
+//
+//        }
+
+//        return Optional.empty();
+
+//        return Optional.empty();
+    }
+
+
+    /**
+     *
+     * @return 当前节点能容纳的最大值
+     */
+    private int tryGetMaxNumber() {
+        return metadata.getOrder() * 2;
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement
-
+        get(key).remove(key);
         return;
     }
 

@@ -21,10 +21,14 @@ public class BPlusTreeMetadata {
     // nodes store between d and 2d (key, record id) pairs. Notable exceptions
     // include the root node and leaf nodes that have been deleted from; these
     // may contain fewer than d entries.
+    //// 树的阶数。给定一个阶数为 d 的树，其内部节点存储 d 到 2d 个键，以及 d+1 到 2d+1 个子节点指针。
+    // 叶节点存储 d 到 2d 个（键，记录 ID）对。
+    // 值得注意的例外情况包括根节点和已被删除的叶节点，这些节点可能包含少于 d 个条目。
     private final int order;
 
     // The partition that the B+ tree allocates pages from. Every node of the B+ tree
     // is stored on a different page on this partition.
+    //// B+ 树从中分配页面的分区。B+ 树的每个节点都存储在此分区的不同页面上。
     private final int partNum;
 
     // The page number of the root node.

@@ -30,6 +30,9 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * project2 task2-leaf
+ */
 @Category(Proj2Tests.class)
 public class TestLeafNode {
     private BufferManager bufferManager;
@@ -91,6 +94,9 @@ public class TestLeafNode {
         }
     }
 
+    /**
+     * 获取最左边的左节点
+     */
     @Test
     @Category(PublicTests.class)
     public void testGetLeftmostLeafL() {
@@ -99,6 +105,9 @@ public class TestLeafNode {
         assertEquals(leaf, leaf.getLeftmostLeaf());
     }
 
+    /**
+     * 测试小批量load
+     */
     @Test
     @Category(PublicTests.class)
     public void testSmallBulkLoad() {
@@ -127,6 +136,9 @@ public class TestLeafNode {
         assertFalse(expected.hasNext());
     }
 
+    /**
+     * 主要是用来判断不超过当前2d的写入
+     */
     @Test
     @Category(PublicTests.class)
     public void testNoOverflowPuts() {
@@ -151,6 +163,9 @@ public class TestLeafNode {
         }
     }
 
+    /**
+     * 调用写入之后 需要落盘
+     */
     @Test
     @Category(PublicTests.class)
     public void testNoOverflowPutsFromDisk() {
@@ -176,6 +191,9 @@ public class TestLeafNode {
         }
     }
 
+    /**
+     * 重复的需要抛异常
+     */
     @Test(expected = BPlusTreeException.class)
     @Category(PublicTests.class)
     public void testDuplicatePut() {
