@@ -147,6 +147,11 @@ class InnerNode extends BPlusNode {
         // TODO(proj2): implement
         //需要找到个节点加入 好像看起来get就是我需要的方法
         LeafNode leafNode = get(key);
+
+        int currentMaxNumber = tryGetMaxNumber();  // 或直接 tryGetMaxNumber() 如果 fillFactor 只用于叶
+
+
+        //子节点分裂
         Optional<Pair<DataBox, Long>> leafReturnValue = leafNode.put(key, rid);
         if (leafReturnValue.isPresent()) {
             Pair<DataBox, Long> pair = leafReturnValue.get();
@@ -174,8 +179,23 @@ class InnerNode extends BPlusNode {
                 this.children.add( pageId);
             }
 
-            this.keys.add(data);
-            this.children.add(pageId);
+            //判断innerNode节点是否要分裂
+            if (this.keys.size()>currentMaxNumber){
+                // 分裂当前内部节点（假设 splitIntoTwo() 返回新右内部节点）
+                InnerNode rightInner = this.splitIntoTwo(leafNode,pair);
+
+                // 提升键（通常是右节点的第一个键；根据项目 spec 调整）
+                DataBox promoteKey = rightInner.keys.get(0);
+                this.keys.remove(key);
+                this.children.remove(pageId);
+
+                // 保存分裂后的节点
+                rightInner.sync();
+                this.sync();
+
+                // 返回提升键和新右节点的页号，继续向上传播
+                return Optional.of(new Pair<>(promoteKey, rightInner.getPage().getPageNum()));
+            }
         }
 
         return Optional.empty();
@@ -188,72 +208,100 @@ class InnerNode extends BPlusNode {
         // TODO(proj2): implement
 
         // 当前叶子节点能容纳的最大值
-        int currentMaxNumber = tryGetMaxNumber();
+        int currentMaxNumber = (int) Math.ceil(tryGetMaxNumber() * fillFactor);  // 或直接 tryGetMaxNumber() 如果 fillFactor 只用于叶
 
-        BPlusNode child = getChild(this.children.size() - 1);
-        child.bulkLoad(data, fillFactor);
+        while (data.hasNext()) {
+
+            BPlusNode child = getChild(this.children.size() - 1);
+            Optional<Pair<DataBox, Long>> splitterKey = child.bulkLoad(data, fillFactor);
+
+            if (splitterKey.isPresent()){
+                // 获取孩子的传播键和页号
+                Pair<DataBox, Long> childPair = splitterKey.get();
 
 
-//        while (data.hasNext()) {
-//            Pair<DataBox, RecordId> pair = data.next();
-//
-//
-//            //   叶节点不会填充到 2*d+1 条记录后分裂，而是填充到比 fillFactor 多一条记录，
-//            // 然后通过创建一个只包含一条记录的右兄弟节点进行“分裂”（原始节点保持所需的填充因子）。
-//            if (this.keys.size() > currentMaxNumber+1) {
-//                Optional<LeafNode> rightSibling = this.getRightSibling();
-//                if (rightSibling.isPresent()) {
-//                    LeafNode rightLeafNode = rightSibling.get();
-//                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
-//                } else {
-//                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
-//                    LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
-//                    当前节点的右端点放在新端点的右边
-//                    rightNode.rightSibling = this.rightSibling;
-//                    this.rightSibling = Optional.of(newPage.getPageNum());
-//
-//                    return Optional.of(new Pair<>(pair.getFirst(),pair.getSecond().getPageNum()));
-//                }
-//
-//            }else {
-//                this.keys.add(pair.getFirst());
-//            }
-//
-//        }
+
+                // 检查是否溢出
+                if (this.keys.size() >= currentMaxNumber) {
+                    // 分裂当前内部节点（假设 splitIntoTwo() 返回新右内部节点）
+                    InnerNode rightInner = this.splitIntoTwo(child,childPair);
+
+                    // 提升键（通常是右节点的第一个键；根据项目 spec 调整）
+                    DataBox promoteKey = rightInner.keys.get(0);
+
+                    // 保存分裂后的节点
+                    rightInner.sync();
+                    this.sync();
+
+                    // 返回提升键和新右节点的页号，继续向上传播
+                    return Optional.of(new Pair<>(promoteKey, rightInner.getPage().getPageNum()));
+                }else {
+                    // 插入到当前内部节点的末尾（数据有序）
+                    this.keys.add(childPair.getFirst());
+                    this.children.add(childPair.getSecond());
+                    this.sync();  // 保存更改
+                }
+
+            }else {
+                return Optional.empty();
+            }
+
+        }
 
         return Optional.empty();
 
-        // 当前叶子节点能容纳的最大值
-//        int currentMaxNumber = (int) Math.ceil(tryGetMaxNumber() * fillFactor);
-
-
-//        while (data.hasNext()) {
-//            Pair<DataBox, RecordId> pair = data.next();
-//            this.keys.add(pair.getFirst());
-//            this.rids.add(pair.getSecond());
-//
-//            //逻辑待验证
-//            if (this.keys.size() > currentMaxNumber) {
-//                Optional<LeafNode> rightSibling = this.getRightSibling();
-//                if (rightSibling.isPresent()) {
-//                    LeafNode rightLeafNode = rightSibling.get();
-//                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
-//                } else {
-//                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
-//                    LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
-//                    //当前节点的右端点放在新端点的右边
-//                    rightNode.rightSibling = this.rightSibling;
-//                    this.rightSibling = Optional.of(newPage.getPageNum());
-//                }
-//
-//            }
-//
-//        }
-
-//        return Optional.empty();
-
-//        return Optional.empty();
     }
+
+    private InnerNode splitIntoTwo(BPlusNode child, Pair<DataBox, Long> childPair) {
+        // 计算分裂点（通常中点后一个，左持 floor((2d+1)/2) -1 键，右持剩余）
+        int mid = (this.keys.size() + 1) / 2;  // 提升键是 mid-1，或根据 spec 调整
+
+        // 创建新右内部节点
+        Page newPage = bufferManager.fetchNewPage(this.treeContext, metadata.getPartNum());
+        try {
+            Pair<DataBox, Long> pair = childPair;
+            DataBox dataBox = pair.getFirst();
+            Long recordId = pair.getSecond();
+            ArrayList<DataBox> keys = new ArrayList<>();
+            keys.add(dataBox);
+            ArrayList<Long> ids = new ArrayList<>();
+            ids.add(child.getPage().getPageNum());
+            ids.add(recordId);
+
+            InnerNode rightInner = new InnerNode(this.metadata, this.bufferManager, keys, ids, this.treeContext);
+
+            // 移动右半键和孩子到新节点（键从 mid 开始，孩子从 mid+1）
+//            rightInner.keys.addAll(this.keys.subList(mid, this.keys.size()));
+//            rightInner.children.addAll(this.children.subList(mid + 1, this.children.size()));
+
+            // 清空原节点的右半
+//            this.keys.subList(mid, this.keys.size()).clear();
+//            this.children.subList(mid + 1, this.children.size()).clear();
+
+            // 提升键是 this.keys.get(mid - 1)，但在 bulkLoad 中可能直接用右首键；这里移除提升键
+//            this.keys.remove(mid - 1);  // 如果提升键从中移除（标准 B+ 树分裂）
+
+            return rightInner;
+        } finally {
+            newPage.unpin();  // 释放 pin
+        }
+    }
+
+//    private InnerNode splitIntoTwo() {
+//        // 获取新页，并用 try-finally 管理 unpin
+//        Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+//        try {
+//            LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+//            rightNode.put(pair.getFirst(), pair.getSecond());  // 添加到新节点
+//            rightNode.rightSibling = this.rightSibling;
+//            this.rightSibling = Optional.of(newPage.getPageNum());
+//            rightNode.sync();
+//            this.sync();  // 保存当前节点
+//            return Optional.of(new Pair<>(pair.getFirst(), newPage.getPageNum()));
+//        } finally {
+//            newPage.unpin();  // 关键：使用后 unpin
+//        }
+//    }
 
 
     /**

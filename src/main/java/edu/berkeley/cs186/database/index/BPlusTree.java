@@ -261,6 +261,24 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
+        Optional<Pair<DataBox, Long>> splitterNode = root.put(key, rid);
+        if (splitterNode.isPresent()) {
+
+            //子节点开始分裂
+                Pair<DataBox, Long> pair = splitterNode.get();
+                DataBox dataBox = pair.getFirst();
+                Long recordId = pair.getSecond();
+                ArrayList<DataBox> keys = new ArrayList<>();
+                keys.add(dataBox);
+                ArrayList<Long> ids = new ArrayList<>();
+                ids.add(root.getPage().getPageNum());
+                ids.add(recordId);
+
+                InnerNode innerNode = new InnerNode(this.metadata, this.bufferManager, keys, ids, this.lockContext);
+                updateRoot(innerNode);
+            }
+
+
         return;
     }
 
@@ -314,6 +332,7 @@ public class BPlusTree {
                 ArrayList<DataBox> keys = new ArrayList<>();
                 keys.add(dataBox);
                 ArrayList<Long> ids = new ArrayList<>();
+                ids.add(root.getPage().getPageNum());
                 ids.add(recordId);
 
                 InnerNode innerNode = new InnerNode(this.metadata, this.bufferManager, keys, ids, this.lockContext);

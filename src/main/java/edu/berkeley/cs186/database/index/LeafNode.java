@@ -260,8 +260,9 @@ class LeafNode extends BPlusNode {
             DataBox dataBox = rightNode.keys.get(0);
             RecordId recordId = rightNode.rids.get(0);
 
-            Pair<DataBox, Long> pair = new Pair<>(dataBox, recordId.getPageNum());
+            Pair<DataBox, Long> pair = new Pair<>(dataBox, rightNode.getPage().getPageNum());
 
+            sync();
             return Optional.of(pair);
         }
 
@@ -271,72 +272,76 @@ class LeafNode extends BPlusNode {
     private LeafNode buildRightNode() {
 
         Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
-        LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
-        //当前节点的右端点放在新端点的右边
-        rightNode.rightSibling = this.rightSibling;
-        this.rightSibling = Optional.of(newPage.getPageNum());
+        try {
+            LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
+            //当前节点的右端点放在新端点的右边
+            rightNode.rightSibling = this.rightSibling;
+            this.rightSibling = Optional.of(newPage.getPageNum());
 
-        int d = this.metadata.getOrder();
-        Iterator<DataBox> keyIterator = this.keys.iterator();
-        Iterator<RecordId> ridIterator = this.rids.iterator();
-        int index = 1;
+            int d = this.metadata.getOrder();
+            Iterator<DataBox> keyIterator = this.keys.iterator();
+            Iterator<RecordId> ridIterator = this.rids.iterator();
+            int index = 1;
 
 
-        while (keyIterator.hasNext() && ridIterator.hasNext()) {
-            DataBox key = keyIterator.next();
-            RecordId rid = ridIterator.next();
-            if (index > d) {
-                keyIterator.remove();
-                ridIterator.remove();
-                rightNode.keys.add(key);
-                rightNode.rids.add(rid);
+            while (keyIterator.hasNext() && ridIterator.hasNext()) {
+                DataBox key = keyIterator.next();
+                RecordId rid = ridIterator.next();
+                if (index > d) {
+                    keyIterator.remove();
+                    ridIterator.remove();
+                    rightNode.keys.add(key);
+                    rightNode.rids.add(rid);
+                }
+
+                index++;
             }
+            rightNode.sync();
 
-            index++;
+
+            return rightNode;
+        } finally {
+            newPage.unpin();
         }
-        rightNode.sync();
-
-
-        return rightNode;
     }
 
     // See BPlusNode.bulkLoad.
     @Override
-    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
-                                                  float fillFactor) {
-        // 当前叶子节点能容纳的最大值
+    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
         int currentMaxNumber = (int) Math.ceil(tryGetMaxNumber() * fillFactor);
-
 
         while (data.hasNext()) {
             Pair<DataBox, RecordId> pair = data.next();
 
+            if (this.keys.size() >= currentMaxNumber) {
+                // 假设右兄弟不存在
+                Optional<Long> rightSiblingId = this.rightSibling;
+//                Optional<LeafNode> rightSibling = this.getRightSibling();
+                if (rightSiblingId.isPresent() && !Objects.equals(rightSiblingId.get(),-1L) ) {
+//                    throw new IllegalStateException("Right sibling should not exist during bulk load");
+                    Optional<LeafNode> rightSibling1 = getRightSibling();
+                    rightSibling1.ifPresent(leafNode -> leafNode.put(pair.getFirst(), pair.getSecond()));
+                }
 
-         //   叶节点不会填充到 2*d+1 条记录后分裂，而是填充到比 fillFactor 多一条记录，
-        // 然后通过创建一个只包含一条记录的右兄弟节点进行“分裂”（原始节点保持所需的填充因子）。
-            if (this.keys.size() > currentMaxNumber+1) {
-                Optional<LeafNode> rightSibling = this.getRightSibling();
-                if (rightSibling.isPresent()) {
-                    LeafNode rightLeafNode = rightSibling.get();
-                    rightLeafNode.put(pair.getFirst(), pair.getSecond());
-                } else {
-                    Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+                // 获取新页，并用 try-finally 管理 unpin
+                Page newPage = this.bufferManager.fetchNewPage(treeContext, metadata.getPartNum());
+                try {
                     LeafNode rightNode = LeafNode.fromBytes(this.metadata, this.bufferManager, treeContext, newPage.getPageNum());
-                    //当前节点的右端点放在新端点的右边
+                    rightNode.put(pair.getFirst(), pair.getSecond());  // 添加到新节点
                     rightNode.rightSibling = this.rightSibling;
                     this.rightSibling = Optional.of(newPage.getPageNum());
                     rightNode.sync();
-
-                    return Optional.of(new Pair<>(pair.getFirst(),pair.getSecond().getPageNum()));
+                    this.sync();  // 保存当前节点
+                    return Optional.of(new Pair<>(pair.getFirst(), newPage.getPageNum()));
+                } finally {
+                    newPage.unpin();  // 关键：使用后 unpin
                 }
-
-            }else {
+            } else {
                 this.keys.add(pair.getFirst());
                 this.rids.add(pair.getSecond());
             }
-
         }
-        sync();
+        this.sync();
 
         return Optional.empty();
     }
