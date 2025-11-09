@@ -177,26 +177,17 @@ class LeafNode extends BPlusNode {
             return this;
         }
 
-        DataBox minData = keys.get(0);
-        DataBox maxData = keys.get(keys.size() - 1);
-
-        if (key.compareTo(minData) >= 0 && key.compareTo(maxData) <= 0) {
-            return this;
-        }
-
-
-//        Optional<LeafNode> rightSibling = this.getRightSibling();
-//        if (rightSibling.isPresent()) {
-//            LeafNode leafNodeFromRightNode = rightSibling.get().get(key);
-//            if (Objects.nonNull(leafNodeFromRightNode)) {
-//                return leafNodeFromRightNode;
-//            } else {
-//                return null;
-//            }
+//        DataBox minData = keys.get(0);
+//        DataBox maxData = keys.get(keys.size() - 1);
+//
+//        if (key.compareTo(minData) >= 0 && key.compareTo(maxData) <= 0) {
+//            return this;
 //        }
-
-
-        return null;
+//
+//
+//
+//
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf. 看起来子节点直接返回他自己
@@ -609,5 +600,19 @@ class LeafNode extends BPlusNode {
     @Override
     public int hashCode() {
         return Objects.hash(page.getPageNum(), keys, rids, rightSibling);
+    }
+
+    public Optional<RecordId> tryGet(DataBox key) {
+
+        int size = this.keys.size();
+        for (int i = 0; i < size; ++i) {
+            DataBox dataBox = this.keys.get(i);
+            RecordId recordId = this.rids.get(i);
+            if (dataBox.equals(key) ) {
+                return Optional.of(recordId);
+            }
+        }
+
+        return Optional.empty();
     }
 }

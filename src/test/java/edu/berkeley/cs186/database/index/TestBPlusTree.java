@@ -411,6 +411,71 @@ public class TestBPlusTree {
 
     @Test
     @Category(PublicTests.class)
+    public void copyTestRandomPuts() {
+        // This test will generate 1000 keys and for trees of degree 2, 3 and 4
+        // will scramble the keys and attempt to insert them.
+        //
+        // After insertion we test scanAll and scanGreaterEqual to ensure all
+        // the keys were inserted and could be retrieved in the proper order.
+        //
+        // Finally, we remove each of the keys one-by-one and check to see that
+        // they can no longer be retrieved.
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> rids = new ArrayList<>();
+        List<RecordId> sortedRids = new ArrayList<>();
+        for (int i = 0; i < 1000; ++i) {
+            keys.add(new IntDataBox(i));
+            rids.add(new RecordId(i, (short) i));
+            sortedRids.add(new RecordId(i, (short) i));
+        }
+
+        // Try trees with different orders.
+        for (int d = 2; d < 5; ++d) {
+            // Try trees with different insertion orders.
+            for (int n = 0; n < 2; ++n) {
+                Collections.shuffle(keys, new Random(42));
+                Collections.shuffle(rids, new Random(42));
+
+                // Insert all the keys.
+                BPlusTree tree = getBPlusTree(Type.intType(), d);
+                for (int i = 0; i < keys.size(); ++i) {
+                    tree.put(keys.get(i), rids.get(i));
+                    assertEquals(Optional.of(rids.get(i)), tree.get(keys.get(i)));
+                }
+
+                // Test get.
+                for (int i = 0; i < keys.size(); ++i) {
+                    assertEquals(Optional.of(rids.get(i)), tree.get(keys.get(i)));
+                }
+
+                // Test scanAll.
+                assertEquals(sortedRids, indexIteratorToList(tree::scanAll));
+
+                // Test scanGreaterEqual.
+                for (int i = 0; i < keys.size(); i += 100) {
+                    final int j = i;
+                    List<RecordId> expected = sortedRids.subList(i, sortedRids.size());
+                    assertEquals(expected, indexIteratorToList(() -> tree.scanGreaterEqual(new IntDataBox(j))));
+                }
+
+                // Load the tree from disk.
+                BPlusTree fromDisk = new BPlusTree(bufferManager, metadata, treeContext);
+                assertEquals(sortedRids, indexIteratorToList(fromDisk::scanAll));
+
+                // Test remove.
+                Collections.shuffle(keys, new Random(42));
+                Collections.shuffle(rids, new Random(42));
+                for (DataBox key : keys) {
+                    fromDisk.remove(key);
+                    assertEquals(Optional.empty(), fromDisk.get(key));
+                }
+            }
+        }
+    }
+
+    @Test
+    @Category(PublicTests.class)
     public void testRandomPuts() {
         // This test will generate 1000 keys and for trees of degree 2, 3 and 4
         // will scramble the keys and attempt to insert them.

@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
+import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
 import java.io.FileWriter;
@@ -146,11 +147,8 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): implement
-
-
-
-
-        return Optional.empty();
+        LeafNode leafNode = root.get(key);
+       return leafNode.tryGet(key);
     }
 
     /**
@@ -261,6 +259,10 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
+        /**
+         * 第一次子节点的分裂 应该按照innerNode来处理？
+         * 不然返回的是新的子节点
+         */
         Optional<Pair<DataBox, Long>> splitterNode = root.put(key, rid);
         if (splitterNode.isPresent()) {
 
@@ -276,7 +278,7 @@ public class BPlusTree {
 
                 InnerNode innerNode = new InnerNode(this.metadata, this.bufferManager, keys, ids, this.lockContext);
                 updateRoot(innerNode);
-            }
+        }
 
 
         return;
@@ -360,6 +362,9 @@ public class BPlusTree {
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
         // TODO(proj2): implement
+        root.remove(key);
+        
+
 
         return;
     }
