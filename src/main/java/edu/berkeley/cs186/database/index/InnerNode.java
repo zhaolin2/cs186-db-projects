@@ -130,28 +130,35 @@ class InnerNode extends BPlusNode {
 
     public BPlusNode getOneLevel(DataBox key) {
         // TODO(proj2): implement
+//
+//        DataBox firstKey = this.keys.get(0);
+//        if (key.compareTo(firstKey)<0){
+//            return getChild(0);
+//        }
+//
+//        int i = 0;
+//        int j = i+1;
+//
+//        int size = this.keys.size();
+//
+//        for (; i < size && j < size; i++,j++) {
+//            DataBox leftNode = this.keys.get(i);
+//            DataBox rightNode = this.keys.get(j);
+//            if (key.compareTo(leftNode)>=0 && key.compareTo(rightNode)<0){
+//                return getChild(j);
+//            }
+//        }
+//
+//
+//
+//        return this.getChild(size);
 
-        DataBox firstKey = this.keys.get(0);
-        if (key.compareTo(firstKey)<0){
-            return getChild(0);
+        int idx = 0;
+        for (; idx < keys.size(); idx++) {
+            if (key.compareTo(keys.get(idx)) < 0) break;
         }
 
-        int i = 0;
-        int j = i+1;
-
-        int size = this.keys.size();
-
-        for (; i < size && j < size; i++,j++) {
-            DataBox leftNode = this.keys.get(i);
-            DataBox rightNode = this.keys.get(j);
-            if (key.compareTo(leftNode)>=0 && key.compareTo(rightNode)<0){
-                return getChild(j);
-            }
-        }
-
-
-
-        return this.getChild(size);
+        return getChild(idx);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -160,7 +167,17 @@ class InnerNode extends BPlusNode {
         assert(children.size() > 0);
         // TODO(proj2): implement
 
-        return LeafNode.fromBytes(this.metadata, this.bufferManager, this.treeContext, this.children.get(0));
+        LeafNode leafNode = null;
+
+        BPlusNode plusNode = getChild(0);
+        while (true) {
+            if (plusNode instanceof LeafNode ) {
+                return (LeafNode)plusNode;
+            }else if (plusNode instanceof InnerNode ) {
+                plusNode = plusNode.getLeftmostLeaf();
+            }
+        }
+
     }
 
     /**
@@ -201,8 +218,8 @@ class InnerNode extends BPlusNode {
             }
             //兜底插入
             if (!whetherInsert){
-                this.keys.add(key);
-                this.children.add( pageId);
+                this.keys.add(data);
+                this.children.add(pageId);
             }
 
             //判断innerNode节点是否要分裂
@@ -210,7 +227,6 @@ class InnerNode extends BPlusNode {
                 return tryReBalance();
             }
         }
-
         sync();
         return Optional.empty();
     }

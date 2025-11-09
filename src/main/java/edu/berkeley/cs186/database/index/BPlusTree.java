@@ -8,6 +8,7 @@ import edu.berkeley.cs186.database.concurrency.LockUtil;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.PageException;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
@@ -176,6 +177,7 @@ public class BPlusTree {
     /**
      * Returns an iterator over all the RecordIds stored in the B+ tree in
      * ascending order of their corresponding keys.
+     * 返回一个迭代器，该迭代器按照对应键的升序遍历 B+ 树中存储的所有 RecordId。
      *
      *   // Create a B+ tree and insert some values into it.
      *   BPlusTree tree = new BPlusTree("t.txt", Type.intType(), 4);
@@ -197,6 +199,9 @@ public class BPlusTree {
      * return an iterator over them. Your iterator must lazily scan over the
      * leaves of the B+ tree. Solutions that materialize all record ids in
      * memory will receive 0 points.
+     *
+     * 注意，您不能在内存中物化所有 record id，然后返回一个迭代器遍历它们。
+     * 您的迭代器必须懒加载地扫描 B+ 树的叶子节点。任何在内存中物化所有 record id 的解决方案将得到 0 分
      */
     public Iterator<RecordId> scanAll() {
         // TODO(proj4_integration): Update the following line
@@ -204,13 +209,52 @@ public class BPlusTree {
 
         // TODO(proj2): Return a BPlusTreeIterator.
 
-        return Collections.emptyIterator();
+
+        return new Iterator<RecordId>() {
+
+            LeafNode leftmostLeaf = root.getLeftmostLeaf();
+            Iterator<RecordId> leafNodeRidIterator = leftmostLeaf.getRids().iterator();
+
+            @Override
+            public boolean hasNext() {
+
+                if (leafNodeRidIterator.hasNext()) {
+                    return true;
+                }else {
+                    try {
+                        Optional<LeafNode> rightSibling = leftmostLeaf.getRightSibling();
+                        if (rightSibling.isPresent()) {
+                            leftmostLeaf = rightSibling.get();
+                            leafNodeRidIterator = leftmostLeaf.getRids().iterator();
+                            return true;
+                        }
+                    } catch (PageException e) {
+                        return false;
+                    }catch (Exception e){
+                        throw new RuntimeException(e);
+                    }
+
+                }
+                return false;
+            }
+
+            @Override
+            public RecordId next() {
+                return leafNodeRidIterator.next();
+            }
+        };
+
+
+//        return Collections.emptyIterator();
     }
 
     /**
      * Returns an iterator over all the RecordIds stored in the B+ tree that
      * are greater than or equal to `key`. RecordIds are returned in ascending
      * of their corresponding keys.
+     *
+     * 返回一个迭代器，该迭代器按照对应键的升序遍历 B+ 树中存储的所有 RecordId，
+     * 这些 RecordId 对应的键大于或等于 key。
      *
      *   // Insert some values into a tree.
      *   tree.put(new IntDataBox(2), new RecordId(2, (short) 2));
@@ -237,7 +281,68 @@ public class BPlusTree {
 
         // TODO(proj2): Return a BPlusTreeIterator.
 
-        return Collections.emptyIterator();
+        LeafNode leafNode = root.get(key);
+
+        int size = leafNode.getKeys().size();
+        int skipSize = 0;
+        for (int i = 0; i < size; i++) {
+            DataBox dataBox = leafNode.getKeys().get(i);
+            if (dataBox.compareTo(key)>=0){
+                break;
+            }else {
+                skipSize++;
+            }
+        }
+
+
+        Iterator<DataBox> dataBoxIterator = leafNode.getKeys().iterator();
+        Iterator<RecordId> recordIdIterator = leafNode.getRids().iterator();
+
+        while (skipSize > 0 && dataBoxIterator.hasNext()) {
+            DataBox next = dataBoxIterator.next();
+            recordIdIterator.next();
+            skipSize--;
+        }
+
+
+
+
+        return new Iterator<RecordId>() {
+
+            LeafNode leftmostLeaf = leafNode;
+            Iterator<RecordId> leafNodeRidIterator = recordIdIterator;
+
+            @Override
+            public boolean hasNext() {
+
+                if (leafNodeRidIterator.hasNext()) {
+                    return true;
+                }else {
+                    try {
+                        Optional<LeafNode> rightSibling = leftmostLeaf.getRightSibling();
+                        if (rightSibling.isPresent()) {
+                            leftmostLeaf = rightSibling.get();
+                            leafNodeRidIterator = leftmostLeaf.getRids().iterator();
+                            return true;
+                        }
+                    } catch (PageException e) {
+                        return false;
+                    }catch (Exception e){
+                        throw new RuntimeException(e);
+                    }
+
+                }
+                return false;
+            }
+
+            @Override
+            public RecordId next() {
+                return leafNodeRidIterator.next();
+            }
+        };
+
+
+//        return Collections.emptyIterator();
     }
 
     /**
