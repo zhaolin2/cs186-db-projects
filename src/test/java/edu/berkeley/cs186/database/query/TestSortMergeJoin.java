@@ -29,6 +29,11 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * 测试SMJ
+ *
+ * task4
+ */
 @Category({Proj3Tests.class, Proj3Part1Tests.class})
 public class TestSortMergeJoin {
     private Database d;

@@ -28,6 +28,10 @@ import java.util.Iterator;
 
 import static org.junit.Assert.*;
 
+/**
+ * 也需要实现
+ * 基础查询 看起来是对的
+ */
 @Category({Proj3Tests.class, Proj3Part2Tests.class})
 public class TestBasicQuery {
     private Database db;

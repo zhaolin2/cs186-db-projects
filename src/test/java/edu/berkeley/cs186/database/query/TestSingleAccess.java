@@ -26,6 +26,10 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertTrue;
 
+/**
+ * task 5
+ *
+ */
 @Category({Proj3Tests.class, Proj3Part2Tests.class})
 public class TestSingleAccess {
     private Database db;

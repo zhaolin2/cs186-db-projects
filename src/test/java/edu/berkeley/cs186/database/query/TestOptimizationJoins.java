@@ -27,6 +27,11 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * 看起来是优化join
+ *
+ * task6
+ */
 @Category({Proj3Tests.class, Proj3Part2Tests.class})
 public class TestOptimizationJoins {
     private Database db;

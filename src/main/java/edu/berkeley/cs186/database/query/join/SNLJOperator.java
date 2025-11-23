@@ -12,6 +12,8 @@ import java.util.NoSuchElementException;
 /**
  * Performs an equijoin between two relations on leftColumnName and
  * rightColumnName respectively using the Simple Nested Loop Join algorithm.
+ *
+ * 使用简单嵌套循环连接算法，分别基于 leftColumnName 和 rightColumnName 对两个关系执行等值连接。
  */
 public class SNLJOperator extends JoinOperator {
     public SNLJOperator(QueryOperator leftSource,
@@ -29,10 +31,18 @@ public class SNLJOperator extends JoinOperator {
         return new SNLJIterator();
     }
 
+    /**
+     * 假设一个悲观场景
+     * 对于左边的任意一条记录 都需要从磁盘中重新扫描右边的所有数据
+     * @return
+     */
     @Override
     public int estimateIOCost() {
+        //获取左边的所有记录数
         int numLeftRecords = getLeftSource().estimateStats().getNumRecords();
+        //获取右边的磁盘的页数
         int numRightPages = getRightSource().estimateStats().getNumPages();
+        //每一条扫描右边的成本数 + 左边的扫描的成本数
         return numLeftRecords * numRightPages + getLeftSource().estimateIOCost();
     }
 
@@ -69,13 +79,17 @@ public class SNLJOperator extends JoinOperator {
                 // The left source was empty, nothing to fetch
                 return null;
             }
+            //需要一直往下循环
             while(true) {
+
+                //右边数据源还有的话就一直遍历
                 if (this.rightSourceIterator.hasNext()) {
                     // there's a next right record, join it if there's a match
                     Record rightRecord = rightSourceIterator.next();
                     if (compare(leftRecord, rightRecord) == 0) {
                         return leftRecord.concat(rightRecord);
                     }
+                    //左边数据源找下一个
                 } else if (leftSourceIterator.hasNext()){
                     // there's no more right records but there's still left
                     // records. Advance left and reset right
@@ -90,6 +104,7 @@ public class SNLJOperator extends JoinOperator {
 
         @Override
         public boolean hasNext() {
+            //为空则拿下一条记录
             if (this.nextRecord == null) this.nextRecord = fetchNextRecord();
             return this.nextRecord != null;
         }

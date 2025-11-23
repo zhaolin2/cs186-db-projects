@@ -179,6 +179,11 @@ public abstract class QueryOperator implements Iterable<Record> {
      * `records` (advancing it in the process) and return a backtracking
      * iterator over those records. Setting maxPages to 1 will result in an
      * iterator over a single page of records.
+    * 此方法将从 `records` 中处理最多 `maxPages` 页的记录
+     * （在此过程中推进记录）并返回一个回溯迭代器
+     * 遍历这些记录。将 maxPages 设置为 1 将返回一个遍历单页记录的迭代器。
+     *
+     * 看起来就是直接拿了N条的数据 然后放在这个迭代器中
      */
     public static BacktrackingIterator<Record> getBlockIterator(Iterator<Record> records, Schema schema, int maxPages) {
         int recordsPerPage = Table.computeNumRecordsPerPage(PageDirectory.EFFECTIVE_PAGE_SIZE, schema);
@@ -223,6 +228,7 @@ public abstract class QueryOperator implements Iterable<Record> {
     /**
      * Estimates the IO cost of executing this query operator.
      *
+     *  估算执行此查询运算符的 I/O 成本。
      * @return estimated number of IO's performed
      */
     public abstract int estimateIOCost();

@@ -7,6 +7,12 @@ import java.util.Iterator;
  * state of the iterator back to that mark. For example, if you had a backtracking
  * iterator with the values [1,2,3]:
  *
+ * * BacktrackingIterator 支持在迭代过程中标记一个点，并将迭代器的状态重置回该标记点。
+ *
+ * * 例如，如果您有一个回溯迭代器，其值为 [1,2,3]：
+ *
+ * *
+ *
  * BackTrackingIterator<Integer> iter = new BackTrackingIteratorImplementation();
  * iter.next();     // returns 1
  * iter.next();     // returns 2

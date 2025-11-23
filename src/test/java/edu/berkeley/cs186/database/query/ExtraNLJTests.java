@@ -32,6 +32,9 @@ import static org.junit.Assert.assertTrue;
  * These are extra tests that *won't be graded*, but should help pinpoint bugs in
  * the tests in TestNestedLoopJoins with excessively detailed output when something
  * messes up.
+ *
+ *
+ *
  */
 public class ExtraNLJTests {
     // All of these tests use 4 records per page. This record size forces the

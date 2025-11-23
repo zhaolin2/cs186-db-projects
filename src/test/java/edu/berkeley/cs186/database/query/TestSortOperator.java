@@ -26,6 +26,11 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * 额外排序
+ *
+ * task3
+ */
 @Category({Proj3Tests.class, Proj3Part1Tests.class})
 public class TestSortOperator {
     private Database d;

@@ -25,6 +25,11 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * hash连接
+ *
+ * task2
+ */
 @Category({Proj3Tests.class, Proj3Part1Tests.class})
 public class TestGraceHashJoin {
     private Database d;

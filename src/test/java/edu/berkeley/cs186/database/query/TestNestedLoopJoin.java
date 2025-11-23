@@ -29,6 +29,16 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 
+/**
+ * 项目3测试
+ *
+ * 嵌套循环连接
+ *
+ * PNLJ和BNLJ都在这里进行测试
+ *
+ * task1
+ *
+ */
 @Category({Proj3Tests.class, Proj3Part1Tests.class})
 public class TestNestedLoopJoin {
     private Database d;
@@ -126,6 +136,10 @@ public class TestNestedLoopJoin {
         // joined on the column "int". Since all records are identical we expect
         // expect exactly 100 x 100 = 10000 records to be yielded.
         // Both tables consist of a single page.
+        // 模拟连接两个表，每个表包含 100 条相同的记录，
+        // 在 "int" 列上连接。由于所有记录相同，我们期望
+        // 精确地产生 100 x 100 = 10000 条记录。
+        // 两个表都由单个页面组成。
         try(Transaction transaction = d.beginTransaction()) {
             setSourceOperators(
                     TestUtils.createSourceWithAllTypes(100),
@@ -184,6 +198,10 @@ public class TestNestedLoopJoin {
     @Test
     @Category(SystemTests.class)
     public void testEmptyWithNonEmptySNLJ() {
+
+        /**
+         *
+         */
         // Joins an empty table with a non-empty table. Expected behavior is
         // that iterator is created without error, and hasNext() immediately
         // returns false.
@@ -206,6 +224,7 @@ public class TestNestedLoopJoin {
     @Test
     @Category(SystemTests.class)
     public void testEmptyWithEmptySNLJ() {
+        //左右都空
         // Joins a empty table with an empty table. Expected behavior is
         // that iterator is created without error, and hasNext() immediately
         // returns false.
@@ -230,6 +249,17 @@ public class TestNestedLoopJoin {
     @Test
     @Category(PublicTests.class)
     public void testSimpleJoinPNLJ() {
+
+        /**
+         * // 模拟连接两个表，每个表包含 100 条相同的记录，
+         *
+         * // 连接依据是“int”列。由于所有记录都相同，我们预期
+         *
+         * // 会生成 100 x 100 = 10,000 条记录。
+         *
+         * // 两个表都包含一个页面。
+         */
+
         // Simulates joining two tables, each containing 100 identical records,
         // joined on the column "int". Since all records are identical we expect
         // expect exactly 100 x 100 = 10,000 records to be yielded.
@@ -252,6 +282,8 @@ public class TestNestedLoopJoin {
             // Creating the iterator should incur 2 IOs, one for the first page
             // of the left relation and one for the first page of the right
             // relation.
+            //一个是第一页的左边
+            //第二个是第二页的右边
             checkIOs(2);
 
             int numRecords = 0;
@@ -322,7 +354,7 @@ public class TestNestedLoopJoin {
         // We only use copies of two different records here:
         // Type 1: (true, 1, "1", 1.0)
         // Type 2: (true, 2, "2", 2.0)
-        //
+        // 每一页应该是200条 总数量=4 * 200 * 200 * 2
         // We join together two tables consisting of:
         // Left Table Page 1:  200 copies of Type 1, 200 copies of Type 2
         // Left Table Page 2:  200 copies of Type 2, 200 copies of Type 1
@@ -375,6 +407,7 @@ public class TestNestedLoopJoin {
             // Constructing the operator should incur 0 IOs
             QueryOperator joinOperator = new PNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
+            joinOperator.estimateIOCost();
             checkIOs(0);
 
             // Creating the iterator should incur 2 IOs, one for the first page
