@@ -205,21 +205,11 @@ public class PNLJOperator extends BNLJOperator {
                     }
                     //左边数据源找下一个
                 } else if (leftBlockIterator.hasNext()){
-                    // there's no more right records but there's still left
-                    // records. Advance left and reset right
                     this.leftRecord = leftBlockIterator.next();
-                    if (Objects.isNull(leftRecord)) {
-                        fetchNextLeftBlock();
-                        this.leftRecord = leftBlockIterator.next();
-                        if (Objects.isNull(leftRecord)) {
-                            return null;
-                        }
-                    }
                     this.rightSourceIterator.reset();
                     fetchNextRightPage();
                 }else if (leftSourceIterator.hasNext()){
                     fetchNextLeftBlock();
-                    this.leftRecord = leftBlockIterator.next();
                     if (Objects.isNull(leftRecord)) {
                         return null;
                     }
