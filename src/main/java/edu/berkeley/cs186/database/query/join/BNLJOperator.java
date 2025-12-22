@@ -80,6 +80,7 @@ public class BNLJOperator extends JoinOperator {
             this.leftSourceIterator = getLeftSource().iterator();
             this.fetchNextLeftBlock();
 
+
             this.rightSourceIterator = getRightSource().backtrackingIterator();
             this.rightSourceIterator.markNext();
             /*
@@ -142,6 +143,7 @@ public class BNLJOperator extends JoinOperator {
             Schema schema = getLeftSource().getSchema();
 //            int numPages = getLeftSource().estimateStats().getNumPages();
             this.leftBlockIterator = QueryOperator.getBlockIterator(this.leftSourceIterator, schema, usableBuffers);
+            this.leftBlockIterator.markNext();
             this.leftRecord = leftBlockIterator.next();
 
 //            this.leftBlockIterator = getLeftSource().iterator();
@@ -171,6 +173,7 @@ public class BNLJOperator extends JoinOperator {
             Schema schema = getRightSource().getSchema();
 //            int numPages = getLeftSource().estimateStats().getNumPages();
             this.rightPageIterator = QueryOperator.getBlockIterator(this.rightSourceIterator, schema, 1);
+            this.rightPageIterator.markNext();
         }
 
         /**
@@ -197,15 +200,12 @@ public class BNLJOperator extends JoinOperator {
                 return null;
             }
 
+            //应该优先匹配内存里的条数 没有的话 再考虑去load
             while (true){
                 //右边数据源还有的话就一直遍历
                 if (this.rightPageIterator.hasNext()) {
                     // there's a next right record, join it if there's a match
                     Record rightRecord = rightPageIterator.next();
-                    if (Objects.isNull(rightRecord)) {
-                        fetchNextRightPage();
-                        rightRecord = rightPageIterator.next();
-                    }
                     if (compare(leftRecord, rightRecord) == 0) {
                         return leftRecord.concat(rightRecord);
                     }
@@ -214,16 +214,14 @@ public class BNLJOperator extends JoinOperator {
                     // there's no more right records but there's still left
                     // records. Advance left and reset right
                     this.leftRecord = leftBlockIterator.next();
-                    if (Objects.isNull(leftRecord)) {
-                        fetchNextLeftBlock();
-                        this.leftRecord = leftBlockIterator.next();
-                        if (Objects.isNull(leftRecord)) {
-                            return null;
-                        }
-                    }
-                    this.rightSourceIterator.reset();
+                    rightPageIterator.reset();
+                }else if (leftSourceIterator.hasNext()){
+                    fetchNextLeftBlock();
+                }else if (rightSourceIterator.hasNext()){
                     fetchNextRightPage();
-                } else {
+                    leftBlockIterator.reset();
+                }
+                else {
                     // if you're here then there are no more records to fetch
                     return null;
                 }

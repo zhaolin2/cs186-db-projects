@@ -2,6 +2,7 @@ package edu.berkeley.cs186.database.query.join;
 
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
+import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.query.JoinOperator;
 import edu.berkeley.cs186.database.query.QueryOperator;
 import edu.berkeley.cs186.database.table.Record;
@@ -196,10 +197,6 @@ public class PNLJOperator extends BNLJOperator {
                 if (this.rightPageIterator.hasNext()) {
                     // there's a next right record, join it if there's a match
                     Record rightRecord = rightPageIterator.next();
-                    if (Objects.isNull(rightRecord)) {
-                        fetchNextRightPage();
-                        rightRecord = rightPageIterator.next();
-                    }
                     if (compare(leftRecord, rightRecord) == 0) {
                         return leftRecord.concat(rightRecord);
                     }

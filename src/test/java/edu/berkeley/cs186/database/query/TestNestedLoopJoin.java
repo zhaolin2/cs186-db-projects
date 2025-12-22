@@ -420,9 +420,13 @@ public class TestNestedLoopJoin {
                 if (count < 200 * 200) {
                     assertEquals("mismatch at record " + count, expectedRecord1, outputIterator.next());
                 } else if (count < 200 * 200 * 2) {
-                    assertEquals("mismatch at record " + count, expectedRecord2, outputIterator.next());
+                    Record next = outputIterator.next();
+//                    System.out.println("count:"+count+",record:"+next);
+                    assertEquals("mismatch at record " + count, expectedRecord2, next);
                 } else if (count < 200 * 200 * 3) {
-                    assertEquals("mismatch at record " + count, expectedRecord1, outputIterator.next());
+                    Record next = outputIterator.next();
+//                    System.out.println("count:"+count+",record:"+next);
+                    assertEquals("mismatch at record " + count, expectedRecord1, next);
                 } else if (count < 200 * 200 * 4) {
                     assertEquals("mismatch at record " + count, expectedRecord2, outputIterator.next());
                 } else if (count < 200 * 200 * 5) {
